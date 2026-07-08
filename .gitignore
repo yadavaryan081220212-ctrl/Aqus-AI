@@ -15,3 +15,6 @@ streamlit/secrets.toml
 .venv/
 venv/
 ENV/
+node_modules/
+.next/
+
