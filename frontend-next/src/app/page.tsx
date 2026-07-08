@@ -417,10 +417,10 @@ function MarkdownRenderer({ content }: { content: string }) {
             </code>
           );
         },
-        ul({ children }: { children: React.ReactNode }) {
+        ul({ children }: { children?: React.ReactNode }) {
           return <ul className="list-disc ml-6 space-y-1">{children}</ul>;
         },
-        ol({ children }: { children: React.ReactNode }) {
+        ol({ children }: { children?: React.ReactNode }) {
           return <ol className="list-decimal ml-6 space-y-1">{children}</ol>;
         },
       }}
