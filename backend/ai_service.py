@@ -1,9 +1,12 @@
 import os
 import json
+from pathlib import Path
 from typing import List, AsyncGenerator
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load environment variables from correct path
+project_root = Path(__file__).parent.parent
+load_dotenv(dotenv_path=project_root / "backend" / ".env")
 
 # Load AI provider from env
 AI_PROVIDER = os.getenv("AI_PROVIDER", "ollama").lower()

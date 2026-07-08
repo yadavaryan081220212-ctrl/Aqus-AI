@@ -1,11 +1,18 @@
 import sys
 import io
 import os
+from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 
+# === Handle package path for both local and Render deployment ===
+# Add the project root to sys.path so 'backend' package imports work
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 # Load environment variables
-load_dotenv()
+load_dotenv(dotenv_path=project_root / "backend" / ".env")
 
 # Fix Unicode encoding issues on Windows FIRST (before wrapping stdout/stderr)
 original_stdout = sys.stdout
@@ -16,7 +23,8 @@ if sys.platform == "win32":
     sys.stderr = io.TextIOWrapper(original_stderr.buffer, encoding='utf-8')
 
 # === LOG EVERYTHING TO A FILE ===
-log_file = open("backend_debug.log", "a", encoding="utf-8")
+log_file_path = project_root / "backend_debug.log"
+log_file = open(log_file_path, "a", encoding="utf-8")
 print(f"\n{'='*60}", file=log_file)
 print(f"=== STARTING BACKEND AT {datetime.now()}", file=log_file)
 print(f"{'='*60}", file=log_file)
@@ -55,7 +63,7 @@ from contextlib import asynccontextmanager
 import webbrowser
 import subprocess
 import platform
-from ai_service import get_ai_service
+from backend.ai_service import get_ai_service
 
 # Get AI service
 ai_service = get_ai_service()
@@ -192,7 +200,8 @@ app.add_middleware(
 )
 
 def init_db():
-    conn = sqlite3.connect('chat_history.db', check_same_thread=False)
+    db_path = project_root / "chat_history.db"
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS messages
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -620,7 +629,7 @@ async def chat(request: ChatRequest):
             response_content = response.message.content
         
         # Save to DB
-        conn = sqlite3.connect('chat_history.db', check_same_thread=False)
+        conn = sqlite3.connect(project_root / "chat_history.db", check_same_thread=False)
         c = conn.cursor()
         for msg in request.messages:
             c.execute('INSERT INTO messages (role, content) VALUES (?, ?)', (msg.role, msg.content))
@@ -653,7 +662,7 @@ async def pull_model(model_name: str):
 
 @app.get("/api/history")
 async def get_history():
-    conn = sqlite3.connect('chat_history.db', check_same_thread=False)
+    conn = sqlite3.connect(project_root / "chat_history.db", check_same_thread=False)
     c = conn.cursor()
     c.execute('SELECT role, content, timestamp FROM messages ORDER BY timestamp')
     history = [{"role": r[0], "content": r[1], "timestamp": r[2]} for r in c.fetchall()]
@@ -662,7 +671,7 @@ async def get_history():
 
 @app.delete("/api/history")
 async def clear_history():
-    conn = sqlite3.connect('chat_history.db', check_same_thread=False)
+    conn = sqlite3.connect(project_root / "chat_history.db", check_same_thread=False)
     c = conn.cursor()
     c.execute('DELETE FROM messages')
     conn.commit()
