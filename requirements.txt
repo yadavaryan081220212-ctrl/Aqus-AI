@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+streamlit
+ollama
+duckduckgo-search
+python-multipart
+sqlalchemy
+python-dotenv
+sseclient-py
+google-generativeai
