@@ -67,7 +67,9 @@ from backend.ai_service import get_ai_service
 
 # Get AI service
 ai_service = get_ai_service()
-AI_PROVIDER = os.getenv("AI_PROVIDER", "ollama").lower()
+AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini").lower()
+DEFAULT_MODEL = os.getenv("AI_MODEL", "gemini-3-flash-preview")
+ENABLE_LOCAL_TOOLS = os.getenv("ENABLE_LOCAL_TOOLS", "false").lower() == "true"
 
 # CORS Configuration
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8502").split(",")
@@ -75,6 +77,8 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost
 # System control functions
 def open_url(url: str) -> str:
     """Open a URL in the default browser"""
+    if not ENABLE_LOCAL_TOOLS:
+        return "Local system tools are disabled in this deployment."
     try:
         webbrowser.open(url)
         return f"Opened {url} successfully!"
@@ -83,6 +87,8 @@ def open_url(url: str) -> str:
 
 def open_file_or_app(path: str) -> str:
     """Open a file or application"""
+    if not ENABLE_LOCAL_TOOLS:
+        return "Local system tools are disabled in this deployment."
     try:
         if platform.system() == "Windows":
             os.startfile(path)
@@ -96,6 +102,8 @@ def open_file_or_app(path: str) -> str:
 
 def execute_command(command: str) -> str:
     """Execute a system command (safe subset)"""
+    if not ENABLE_LOCAL_TOOLS:
+        return "Local system tools are disabled in this deployment."
     try:
         result = subprocess.run(
             command,
@@ -157,7 +165,12 @@ TOOLS = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Preload default model if available
+    # Startup: preload a local model only when Ollama is enabled.
+    if AI_PROVIDER != "ollama":
+        print(f"[INFO] Using {AI_PROVIDER} provider with default model {DEFAULT_MODEL}")
+        yield
+        return
+
     try:
         # Get list of available models first
         available_models_list = await ai_service.list_models()
@@ -172,7 +185,6 @@ async def lifespan(app: FastAPI):
                 break
         
         if default_model and hasattr(ai_service, "client"):
-            # Preload only if we're using Ollama
             await ai_service.client.chat(
                 model=default_model,
                 messages=[{"role": "user", "content": "hi"}],
@@ -219,7 +231,7 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[Message]
-    model: str = "qwen2.5:0.5b"
+    model: str = DEFAULT_MODEL
     use_web_search: bool = False
 
 class ChatResponse(BaseModel):
@@ -317,8 +329,8 @@ async def generate_response(messages: List[dict], model: str) -> AsyncGenerator[
         print(f"[DEBUG] Generating response with model: {model}")
         print(f"[DEBUG] Messages: {messages}")
         
-        if AI_PROVIDER == "ollama":
-            # First request with tools (only if using Ollama)
+        if AI_PROVIDER == "ollama" and ENABLE_LOCAL_TOOLS:
+            # First request with tools only for local Ollama sessions.
             response = None
             tool_calls = None
             assistant_content = ""
@@ -467,7 +479,7 @@ async def generate_response(messages: List[dict], model: str) -> AsyncGenerator[
                 async for chunk in ai_service.chat_stream(messages, model):
                     yield chunk
         else:
-            # For Gemini and other providers, just stream normally without tool handling
+            # For Gemini or hosted deployments, stream a normal assistant response.
             async for chunk in ai_service.chat_stream(messages, model):
                 yield chunk
         
@@ -481,94 +493,12 @@ async def generate_response(messages: List[dict], model: str) -> AsyncGenerator[
 @app.post("/api/chat/stream")
 async def chat_stream(request: ChatRequest):
     try:
-        # === 100% RELIABLE PRE-CHECK FOR OPEN/SEARCH COMMANDS ===
-        last_user_msg = None
-        last_user_msg_original = None
-        for msg in reversed(request.messages):
-            if hasattr(msg, "content"):
-                last_user_msg = msg.content.lower()
-                last_user_msg_original = msg.content
-                break
-        
-        if last_user_msg:
-            print(f"\n===== [PRE-CHECK] Last user message: '{last_user_msg}' =====")
-            
-            # === CHECK FOR SEARCH COMMAND ===
-            if "search" in last_user_msg:
-                import re
-                import urllib.parse
-                # Try to match patterns like "search X in Y" or "search X on Y"
-                pattern = r"search\s+(.*?)\s+(?:in|on)\s+(.*)"
-                match = re.search(pattern, last_user_msg_original, re.IGNORECASE)
-                
-                query = ""
-                site = ""
-                
-                if match:
-                    query = match.group(1).strip()
-                    site = match.group(2).strip().lower()
-                else:
-                    # If no "in/on" specified, check if any site is mentioned
-                    sites_keywords = {
-                        "youtube": "youtube",
-                        "google": "google",
-                        "bing": "bing",
-                        "duckduckgo": "duckduckgo",
-                        "github": "github",
-                        "amazon": "amazon"
-                    }
-                    for keyword, site_name in sites_keywords.items():
-                        if keyword in last_user_msg:
-                            site = site_name
-                            # Extract query by removing site keyword
-                            query = last_user_msg_original.lower().replace("search", "").replace(keyword, "").strip()
-                            break
-                
-                # Map sites to search URLs
-                site_search_urls = {
-                    "youtube": "https://www.youtube.com/results?search_query=",
-                    "google": "https://www.google.com/search?q=",
-                    "bing": "https://www.bing.com/search?q=",
-                    "duckduckgo": "https://duckduckgo.com/?q=",
-                    "github": "https://github.com/search?q=",
-                    "amazon": "https://www.amazon.com/s?k="
-                }
-                
-                # If we have both query and site, open search results
-                if query and site in site_search_urls:
-                    encoded_query = urllib.parse.quote_plus(query)
-                    url = f"{site_search_urls[site]}{encoded_query}"
-                    print(f"[PRE-CHECK] Opening search: {url}")
-                    open_url(url)
-                # If we have query but no site, default to Google
-                elif query:
-                    encoded_query = urllib.parse.quote_plus(query)
-                    url = f"https://www.google.com/search?q={encoded_query}"
-                    print(f"[PRE-CHECK] Opening Google search: {url}")
-                    open_url(url)
-            
-            # Pre-check for website open
-            elif "open" in last_user_msg:
-                if "youtube" in last_user_msg:
-                    print(f"[PRE-CHECK] Opening YouTube!")
-                    open_url("https://youtube.com")
-                elif "google" in last_user_msg:
-                    print(f"[PRE-CHECK] Opening Google!")
-                    open_url("https://google.com")
-                # Pre-check for apps
-                elif "notepad" in last_user_msg:
-                    print(f"[PRE-CHECK] Opening Notepad!")
-                    open_file_or_app("notepad")
-                elif "calc" in last_user_msg or "calculator" in last_user_msg:
-                    print(f"[PRE-CHECK] Opening Calculator!")
-                    open_file_or_app("calc")
-        
         # Run web search in parallel if enabled
         context = ""
         if request.use_web_search and request.messages:
             context = await run_web_search(request.messages[-1].content)
         
-        if AI_PROVIDER == "ollama":
+        if AI_PROVIDER == "ollama" and ENABLE_LOCAL_TOOLS:
             system_prompt = """🔧 YOU ARE A TOOL-USER BOT! 🔧
 
 ABSOLUTELY CRITICAL RULES:
@@ -603,6 +533,15 @@ DO NOT RESPOND WITHOUT CALLING A TOOL FIRST!"""
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/health")
+async def health_check():
+    return {
+        "status": "ok",
+        "provider": AI_PROVIDER,
+        "default_model": DEFAULT_MODEL,
+        "local_tools_enabled": ENABLE_LOCAL_TOOLS
+    }
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):

@@ -9,6 +9,8 @@ __pycache__/
 *.db
 *.db-journal
 .env
+backend/.env
+frontend-next/.env.local
 chroma/
 *.log
 streamlit/secrets.toml
@@ -17,4 +19,3 @@ venv/
 ENV/
 node_modules/
 .next/
-

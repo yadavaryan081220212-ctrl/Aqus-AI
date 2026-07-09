@@ -3,66 +3,66 @@
 A free, open-source personal AI assistant built with modern tools.
 
 ## Tech Stack
-- **AI Models**: Ollama (local) or Google Gemini (cloud)
+- **AI Models**: Google Gemini API by default, with optional local Ollama support
 - **Backend**: FastAPI
-- **Frontend**: Streamlit
+- **Frontend**: Next.js
 - **Database**: SQLite (chat history)
 - **Web Search**: DuckDuckGo Search
-- **Programming**: Python
+- **Programming**: Python and TypeScript
 
 ## Setup Instructions
 
-### Option 1: Using Ollama (Local)
-1. **Install Ollama**: Download and install Ollama from https://ollama.com
-
-2. **Pull a Model**:
-   ```bash
-   ollama pull qwen2.5:0.5b
-   ```
-
-3. **Configure**: In `backend/.env`, set:
-   ```
-   AI_PROVIDER=ollama
-   AI_MODEL=qwen2.5:0.5b
-   ```
-
-### Option 2: Using Google Gemini (Cloud)
-1. **Get Gemini API Key**: Get one from https://aistudio.google.com/app/apikey
-
-2. **Configure**: In `backend/.env`, set:
+### Option 1: Google Gemini API
+1. **Get a Gemini API key** from https://aistudio.google.com/app/apikey
+2. **Configure** `backend/.env`:
    ```
    AI_PROVIDER=gemini
    AI_API_KEY=your_actual_gemini_api_key_here
-   AI_MODEL=gemini-2.0-flash
+   AI_MODEL=gemini-3-flash-preview
+   ENABLE_LOCAL_TOOLS=false
    ```
 
-### Common Steps for Both Options
-3. **Install Python Dependencies**:
+### Option 2: Ollama (Local Only)
+1. **Install Ollama** from https://ollama.com
+2. **Pull a model**:
    ```bash
-   pip install -r requirements.txt
+   ollama pull qwen2.5:0.5b
+   ```
+3. **Configure** `backend/.env`:
+   ```
+   AI_PROVIDER=ollama
+   AI_MODEL=qwen2.5:0.5b
+   ENABLE_LOCAL_TOOLS=true
    ```
 
-4. **Run the Backend**:
+### Run Locally
+1. **Install backend dependencies**:
+   ```bash
+   pip install -r backend/requirements.txt
+   ```
+
+2. **Run the backend**:
    ```bash
    cd backend
-   uvicorn main:app --reload
+   python main.py
    ```
 
-5. **Run the Frontend (in a new terminal)**:
+3. **Run the frontend** in a new terminal:
    ```bash
-   cd frontend
-   streamlit run app.py
+   cd frontend-next
+   npm install
+   npm run dev
    ```
 
 ## Features
-- 🤖 Natural conversation with Ollama or Gemini models
+- 🤖 Natural conversation with Gemini or Ollama models
 - 📜 Chat history stored in SQLite
 - 🔍 Web search with DuckDuckGo
 - 🧠 Memory toggle (remember chat history or not)
-- 💬 Beautiful Streamlit UI
-- 🔧 Tools to open URLs, files, and run commands
+- 💬 Next.js chat interface
+- 🔧 Optional local tools for desktop-only Ollama sessions
 
 ## Usage
 1. Start both backend and frontend
-2. Open your browser to http://localhost:8502
+2. Open your browser to http://localhost:3000
 3. Start chatting!

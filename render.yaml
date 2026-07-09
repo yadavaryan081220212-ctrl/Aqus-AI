@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: aqus-ai-backend
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: python backend/main.py
+    healthCheckPath: /api/health
+    envVars:
+      - key: AI_PROVIDER
+        value: gemini
+      - key: AI_MODEL
+        value: gemini-3-flash-preview
+      - key: ENABLE_LOCAL_TOOLS
+        value: "false"
+      - key: HOST
+        value: 0.0.0.0

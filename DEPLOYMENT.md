@@ -3,7 +3,7 @@
 ## Overview
 - **Frontend**: Next.js (Vercel)
 - **Backend**: FastAPI (Render)
-- **AI**: Ollama (local) or cloud providers (Gemini, Groq, OpenRouter, etc.)
+- **AI**: Google Gemini API
 
 ---
 
@@ -15,15 +15,17 @@
 3. Connect your GitHub repo
 
 ### Step 2: Configure Render
-- **Build Command**: `pip install -r requirements.txt`
-- **Start Command**: `cd backend && python main.py`
+- **Build Command**: `pip install -r backend/requirements.txt`
+- **Start Command**: `python backend/main.py`
+- **Health Check Path**: `/api/health`
 - **Environment Variables**:
-  - `AI_PROVIDER`: `ollama` (or your cloud provider)
-  - `AI_API_KEY`: (if using cloud provider)
-  - `AI_MODEL`: `qwen2.5:0.5b` (or your model)
+  - `AI_PROVIDER`: `gemini`
+  - `AI_API_KEY`: Your Gemini API key
+  - `AI_MODEL`: `gemini-3-flash-preview`
+  - `ENABLE_LOCAL_TOOLS`: `false`
   - `CORS_ORIGINS`: Your frontend URL (e.g., `https://your-app.vercel.app`)
   - `HOST`: `0.0.0.0`
-  - `PORT`: `10000` (Render's default)
+  - `PORT`: Leave unset and let Render provide it automatically
 
 ---
 
@@ -44,8 +46,7 @@
 
 ### Run Backend
 ```bash
-cd backend
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 python main.py
 ```
 
@@ -55,3 +56,7 @@ cd frontend-next
 npm install
 npm run dev
 ```
+
+## Notes
+- Server-side desktop actions like opening apps, files, or local browser tabs are disabled by default for hosted deployments.
+- Keep `backend/.env` and `frontend-next/.env.local` out of version control and set production values in Render/Vercel dashboards.

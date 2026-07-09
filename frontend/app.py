@@ -38,10 +38,10 @@ def get_available_models():
             "qwen2.5:1.5b": "Small (~950 MB) - Balanced",
             "llama3.2:3b": "Medium (~2.0 GB) - Better Quality",
             "phi3:mini": "Small (~2.3 GB) - Good for coding",
-            "models/gemini-2.0-flash": "Gemini 2.0 Flash - Fast & Modern",
+            "models/gemini-3-flash-preview": "Gemini 3 Flash - Preview",
             "models/gemini-1.5-flash": "Gemini 1.5 Flash - Fast",
             "models/gemini-1.5-pro": "Gemini 1.5 Pro - High Quality",
-            "gemini-2.0-flash": "Gemini 2.0 Flash - Fast & Modern",
+            "gemini-3-flash-preview": "Gemini 3 Flash - Preview",
             "gemini-1.5-flash": "Gemini 1.5 Flash - Fast",
             "gemini-1.5-pro": "Gemini 1.5 Pro - High Quality"
         }
@@ -113,7 +113,7 @@ with st.sidebar:
                     st.error(f"Error: {e}")
     
     st.divider()
-    st.info("💡 Tips:\n1. Use qwen2.5:0.5b (Ollama) or Gemini 2.0 Flash for speed\n2. Backend supports both Ollama and Gemini\n3. Keep web search off for speed")
+    st.info("💡 Tips:\n1. Use qwen2.5:0.5b (Ollama) or Gemini 3 Flash for speed\n2. Backend supports both Ollama and Gemini\n3. Keep web search off for speed")
 
 # Chat area
 for message in st.session_state.messages:

@@ -9,9 +9,9 @@ project_root = Path(__file__).parent.parent
 load_dotenv(dotenv_path=project_root / "backend" / ".env")
 
 # Load AI provider from env
-AI_PROVIDER = os.getenv("AI_PROVIDER", "ollama").lower()
+AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini").lower()
 AI_API_KEY = os.getenv("AI_API_KEY", "")
-AI_MODEL = os.getenv("AI_MODEL", "qwen2.5:0.5b")
+AI_MODEL = os.getenv("AI_MODEL", "gemini-3-flash-preview")
 
 class AIService:
     """Abstract base class for AI providers"""
@@ -97,6 +97,8 @@ class OllamaService(AIService):
 class GeminiService(AIService):
     def __init__(self):
         import warnings
+        if not AI_API_KEY:
+            raise ValueError("AI_API_KEY is required when AI_PROVIDER=gemini")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             import google.generativeai as genai
@@ -193,9 +195,8 @@ class GeminiService(AIService):
 
 def get_ai_service() -> AIService:
     """Factory function to get the appropriate AI service"""
+    if AI_PROVIDER == "gemini":
+        return GeminiService()
     if AI_PROVIDER == "ollama":
         return OllamaService()
-    elif AI_PROVIDER == "gemini":
-        return GeminiService()
-    else:
-        return OllamaService()  # Fallback to Ollama
+    raise ValueError(f"Unsupported AI_PROVIDER: {AI_PROVIDER}")

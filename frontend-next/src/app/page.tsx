@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Plus, Settings, Menu, X, Bot, User, Copy, Check } from 'lucide-react';
+import { Send, Plus, Menu, X, Bot, User, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -131,18 +131,31 @@ export default function Home() {
         },
         body: JSON.stringify({
           messages: messagesToSend,
-          model: 'qwen2.5:0.5b',
           use_web_search: useWebSearch,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get response');
+        let errorMessage = 'Failed to get response';
+        try {
+          const errorData = await response.json();
+          if (typeof errorData?.detail === 'string') {
+            errorMessage = errorData.detail;
+          }
+        } catch {
+          // Ignore JSON parsing errors and keep the fallback message.
+        }
+        throw new Error(errorMessage);
       }
 
-      const reader = response.body?.getReader();
+      if (!response.body) {
+        throw new Error('Streaming is not available from the backend.');
+      }
+
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantMessage = '';
+      let sseBuffer = '';
 
       // Add a placeholder for assistant message
       setConversations((prev) =>
@@ -156,48 +169,70 @@ export default function Home() {
         )
       );
 
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          sseBuffer += decoder.decode();
+        } else {
+          sseBuffer += decoder.decode(value, { stream: true });
+        }
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
+        const events = sseBuffer.split('\n\n');
+        sseBuffer = events.pop() || '';
 
+        for (const event of events) {
+          const lines = event.split('\n');
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const dataStr = line.slice(6);
-              if (dataStr === '[DONE]') {
-                break;
+            if (!line.startsWith('data: ')) {
+              continue;
+            }
+
+            const dataStr = line.slice(6);
+            if (dataStr === '[DONE]') {
+              break;
+            }
+
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.error) {
+                throw new Error(data.error);
               }
-              try {
-                const data = JSON.parse(dataStr);
-                if (data.content) {
-                  assistantMessage += data.content;
-                  setConversations((prev) =>
-                    prev.map((conv) =>
-                      conv.id === activeConversationId
-                        ? {
-                            ...conv,
-                            messages: conv.messages.map((msg, idx) =>
-                              idx === conv.messages.length - 1
-                                ? { ...msg, content: assistantMessage }
-                                : msg
-                            ),
-                          }
-                        : conv
-                    )
-                  );
-                }
-              } catch (e) {
-                // Ignore invalid JSON
+
+              if (!data.content) {
+                continue;
+              }
+
+              assistantMessage += data.content;
+              setConversations((prev) =>
+                prev.map((conv) =>
+                  conv.id === activeConversationId
+                    ? {
+                        ...conv,
+                        messages: conv.messages.map((msg, idx) =>
+                          idx === conv.messages.length - 1
+                            ? { ...msg, content: assistantMessage }
+                            : msg
+                        ),
+                      }
+                    : conv
+                )
+              );
+            } catch (e) {
+              if (e instanceof Error) {
+                throw e;
               }
             }
           }
         }
+
+        if (done) {
+          break;
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Sorry, something went wrong.';
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === activeConversationId
@@ -205,7 +240,7 @@ export default function Home() {
                 ...conv,
                 messages: [
                   ...conv.messages,
-                  { role: 'assistant', content: 'Sorry, something went wrong.' },
+                  { role: 'assistant', content: errorMessage },
                 ],
               }
             : conv
@@ -320,7 +355,7 @@ export default function Home() {
                 <Bot className="w-24 h-24 text-primary mb-4" />
                 <h2 className="text-2xl font-bold mb-2">How can I help you?</h2>
                 <p className="text-mutedForeground max-w-md">
-                  Ask me anything! Try commands like "Open YouTube" or "Search cat in YouTube"
+                  Ask me anything with your Gemini-powered assistant.
                 </p>
               </div>
             ) : (
@@ -407,7 +442,7 @@ function MarkdownRenderer({ content }: { content: string }) {
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
-        code({ node, inline, className, children, ...props }: any) {
+        code({ inline, className, children, ...props }: any) {
           const match = /language-(\w+)/.exec(className || '');
           return !inline && match ? (
             <CodeBlock language={match[1]} value={String(children).replace(/\n$/, '')} />
